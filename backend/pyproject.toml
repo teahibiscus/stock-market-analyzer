@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stock-market-analyzer-backend"
+version = "0.1.0"
+description = "Backend package for the stock market analyzer modular monolith"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.18",
+    "fastapi>=0.115",
+    "pydantic-settings>=2.6",
+    "psycopg[binary]>=3.2",
+    "redis>=5.0",
+    "sqlalchemy>=2.0",
+    "uvicorn[standard]>=0.32",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build",
+    "httpx>=0.27",
+    "mypy",
+    "pytest",
+    "ruff",
+]
+
+[project.scripts]
+stock-market-analyzer-api = "stock_market_analyzer.app.main:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers"
+testpaths = ["tests"]
