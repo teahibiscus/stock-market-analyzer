@@ -22,8 +22,10 @@ implemented:
 - SQLAlchemy instrument repository with symbol and company-name matching
 - `GET /api/v1/instruments/search` with validation, typed states, errors, and telemetry
 - Accessible search UI with debounce, cancellation, retry, result selection, and responsive layout
+- AAPL OHLCV candlestick chart with historical demo candles and SSE updates
+- Interval and period controls with compatibility enforcement and responsive chart sizing
 
-The first database-backed symbol and company search vertical slice is complete.
+The database-backed instrument-search slice and the first AAPL candlestick-chart slice are complete.
 
 ## Prerequisites
 
@@ -112,7 +114,48 @@ npm install
 npm run dev --workspace frontend
 ```
 
-Open `http://127.0.0.1:3000` to use instrument search and view the backend health probe.
+Open `http://localhost:3000` (primary) or `http://127.0.0.1:3000` to use instrument search,
+the AAPL chart, and the backend health probe. The backend CORS allow-list permits both local origins.
+
+## Run the AAPL chart locally
+
+Create `.env`, start dependencies, and apply migrations from the repository root:
+
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --wait
+.\.venv\Scripts\alembic.exe -c backend/alembic.ini upgrade head
+```
+
+Start the backend in one terminal:
+
+```powershell
+.\.venv\Scripts\python.exe -m stock_market_analyzer.app.main
+```
+
+Start the frontend in another terminal:
+
+```powershell
+npm run dev --workspace frontend
+```
+
+The home page loads AAPL historical OHLCV candles and continuously replaces the active candle from
+an SSE stream. All chart prices are **simulated demo data, not live exchange market data**.
+
+History and stream endpoints:
+
+```text
+GET http://127.0.0.1:8000/api/v1/market-data/candles?symbol=AAPL&interval=1m&period=1d
+GET http://127.0.0.1:8000/api/v1/market-data/stream?symbol=AAPL&interval=1m
+```
+
+Supported intervals are `1m`, `2m`, `5m`, `15m`, `30m`, `1h`, and `1d`. Supported periods are
+`1d`, `5d`, `1mo`, `3mo`, `6mo`, and `1y`. The period control disables combinations the backend
+does not support. Changing to an interval incompatible with the selected period automatically picks
+that interval's first compatible period.
+
+Known chart limitations: there is no production market-data provider, entitlement enforcement,
+stream heartbeat, or missed-event replay.
 
 ## Test the vertical slice locally
 
@@ -233,7 +276,8 @@ container builds, and deployment stages remain deferred.
 
 ## Deferred work
 
-- Authentication, provider integrations, ingestion, charting, indicators, and watchlists
+- Authentication, production provider integrations, ingestion, indicators, and watchlists
+- Market-data entitlements, SSE heartbeat, and missed-event replay
 - Managed queue, object storage, secrets manager, and production observability integrations
 
 The next story should be selected from `product-requirements/MANIFEST.md` and scoped from its PRDs

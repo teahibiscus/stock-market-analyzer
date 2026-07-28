@@ -30,6 +30,16 @@ from stock_market_analyzer.modules.instruments.infrastructure.persistence.reposi
 from stock_market_analyzer.modules.instruments.ports.instrument_reference_provider import (
     InstrumentReferenceProvider,
 )
+from stock_market_analyzer.modules.market_data.api.router import (
+    MarketDataProviderFactory,
+    create_market_data_router,
+)
+from stock_market_analyzer.modules.market_data.infrastructure.provider.demo_provider import (
+    DemoMarketDataProvider,
+)
+from stock_market_analyzer.modules.market_data.ports.market_data_provider import (
+    MarketDataProvider,
+)
 from stock_market_analyzer.shared.infrastructure.cache.health import (
     check_cache_health,
     create_redis_client,
@@ -48,6 +58,7 @@ def create_app(
     database_health_checker: Callable[[], bool] | None = None,
     cache_health_checker: Callable[[], bool] | None = None,
     instrument_reference_provider: InstrumentReferenceProvider | None = None,
+    market_data_provider: MarketDataProvider | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
     configure_logging(resolved_settings)
@@ -69,11 +80,25 @@ def create_app(
         assert database_engine is not None
         provider_factory = _repository_provider_factory(database_engine)
 
+    market_data_provider_factory = _constant_market_data_provider_factory(
+        market_data_provider or DemoMarketDataProvider()
+    )
+    frontend_origins = list(
+        dict.fromkeys(
+            origin
+            for origin in (
+                resolved_settings.frontend_origin,
+                resolved_settings.frontend_additional_origin,
+            )
+            if origin is not None
+        )
+    )
+
     app = FastAPI(title=resolved_settings.app_name)
     app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[resolved_settings.frontend_origin],
+        allow_origins=frontend_origins,
         allow_methods=["GET"],
         allow_headers=["Content-Type", "X-Correlation-ID"],
         expose_headers=["X-Correlation-ID"],
@@ -92,6 +117,14 @@ def create_app(
         ),
         prefix="/api/v1",
     )
+    app.include_router(
+        create_market_data_router(
+            provider_factory=market_data_provider_factory,
+            data_source=resolved_settings.market_data_source,
+            stream_interval_seconds=resolved_settings.market_data_stream_interval_seconds,
+        ),
+        prefix="/api/v1",
+    )
 
     app.add_exception_handler(ApiError, cast(ExceptionHandler, api_error_exception_handler))
     app.add_exception_handler(
@@ -106,6 +139,15 @@ def _constant_provider_factory(
     provider: InstrumentReferenceProvider,
 ) -> InstrumentProviderFactory:
     def provide() -> nullcontext[InstrumentReferenceProvider]:
+        return nullcontext(provider)
+
+    return provide
+
+
+def _constant_market_data_provider_factory(
+    provider: MarketDataProvider,
+) -> MarketDataProviderFactory:
+    def provide() -> nullcontext[MarketDataProvider]:
         return nullcontext(provider)
 
     return provide

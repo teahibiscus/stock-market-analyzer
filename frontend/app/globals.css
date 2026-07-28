@@ -9,12 +9,13 @@ body {
 }
 
 main {
-  max-width: 48rem;
+  max-width: 80rem;
   margin: 0 auto;
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -99,6 +100,75 @@ button:disabled {
   font-weight: 700;
 }
 
+.chart-panel {
+  margin-block: 2rem;
+  padding: 1.25rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 0.75rem;
+}
+
+.chart-panel-heading {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.chart-panel-heading h2,
+.chart-panel-heading p {
+  margin-block: 0 0.5rem;
+}
+
+.chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.chart-controls label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 700;
+}
+
+.chart-controls select,
+.chart-message button {
+  padding: 0.55rem 0.75rem;
+}
+
+.chart-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-height: 1.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.chart-badge {
+  padding: 0.3rem 0.55rem;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 999px;
+  font-size: 0.875rem;
+}
+
+.chart-badge-warning {
+  border-color: #f59e0b;
+}
+
+.chart-message {
+  margin-block: 0.75rem;
+}
+
+.candlestick-chart {
+  width: 100%;
+  height: 28rem;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 0.5rem;
+}
+
 @media (max-width: 36rem) {
   body {
     padding: 1rem;
@@ -112,5 +182,19 @@ button:disabled {
   .instrument-result {
     grid-template-columns: 1fr;
     gap: 0.25rem;
+  }
+
+  .chart-panel {
+    padding: 0.8rem;
+  }
+
+  .chart-panel-heading,
+  .chart-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .candlestick-chart {
+    height: 20rem;
   }
 }
