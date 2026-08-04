@@ -46,9 +46,9 @@ def test_history_schema_serializes_aliases_success_freshness_and_demo_warning() 
     assert payload["asOf"] == "2026-07-24T15:30:05Z"
     assert payload["timezone"] == "UTC"
     assert payload["metadata"]["state"] == "SUCCESS"
-    assert payload["metadata"]["freshness"]["providerTimestamp"] == "2026-07-24T15:30:05Z"
-    assert payload["metadata"]["freshness"]["state"] == "FRESH"
-    assert any("simulated" in warning.lower() for warning in payload["metadata"]["warnings"])
+    assert payload["metadata"]["freshness"]["providerTimestamp"] == "2026-07-24T15:30:00Z"
+    assert payload["metadata"]["freshness"]["state"] == "STALE"
+    assert "SYNTHETIC_MARKET_DATA" in payload["metadata"]["warnings"]
 
 
 def test_history_schema_represents_empty_results() -> None:

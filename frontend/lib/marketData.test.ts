@@ -66,7 +66,7 @@ describe("market-data compatibility", () => {
 });
 
 describe("fetchCandles", () => {
-  it("normalizes the symbol, constructs canonical parameters, and forwards the abort signal", async () => {
+  it("uses the instrument ID, constructs canonical parameters, and forwards the abort signal", async () => {
     const signal = new AbortController().signal;
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -75,10 +75,10 @@ describe("fetchCandles", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      fetchCandles("http://127.0.0.1:8000/", " aapl ", "1m", "1d", signal),
+      fetchCandles("http://127.0.0.1:8000/", "instrument/aapl", "1m", "1d", signal),
     ).resolves.toBe(historyResponse);
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:8000/api/v1/market-data/candles?symbol=AAPL&interval=1m&period=1d",
+      "http://127.0.0.1:8000/api/v1/charts/instrument%2Faapl?interval=1m&period=1d",
       {
         headers: { Accept: "application/json" },
         signal,

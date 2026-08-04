@@ -87,10 +87,10 @@ def test_provider_accepts_lowercase_aapl() -> None:
 def test_provider_rejects_unsupported_symbols() -> None:
     provider = DemoMarketDataProvider(clock=lambda: FIXED_NOW)
 
-    with pytest.raises(SymbolNotSupportedError, match="MSFT"):
-        provider.get_candles("MSFT", Interval.ONE_DAY, Period.ONE_MONTH)
-    with pytest.raises(SymbolNotSupportedError, match="MSFT"):
-        provider.iter_updates("MSFT", Interval.ONE_MINUTE)
+    with pytest.raises(SymbolNotSupportedError, match="TSLA"):
+        provider.get_candles("TSLA", Interval.ONE_DAY, Period.ONE_MONTH)
+    with pytest.raises(SymbolNotSupportedError, match="TSLA"):
+        provider.iter_updates("TSLA", Interval.ONE_MINUTE)
 
 
 def test_provider_rejects_unsupported_interval_period_combination() -> None:

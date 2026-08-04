@@ -121,7 +121,9 @@ function renderPanel(overrides: Partial<ChartPanelProps> = {}) {
   return render(
     <ChartPanel
       apiBaseUrl="http://api.test"
-      symbol="AAPL"
+      instrumentId="instrument-aapl"
+      initialInterval="1m"
+      initialPeriod="1d"
       ChartComponent={FakeChart}
       {...overrides}
     />,
@@ -137,7 +139,7 @@ describe("ChartPanel", () => {
     const stream = createStreamHarness();
     renderPanel({ createStream: stream.factory, fetchHistory });
 
-    expect(screen.getByRole("status")).toHaveTextContent("Loading AAPL chart");
+    expect(screen.getByRole("status")).toHaveTextContent("Loading chart");
     expect(stream.factory).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -148,6 +150,16 @@ describe("ChartPanel", () => {
     expect(screen.getByTestId("chart")).toHaveTextContent('"close":"210.10"');
     expect(screen.getByText(/simulated demo data/i)).toBeVisible();
     expect(screen.getByRole("heading", { name: /AAPL.*1m.*1d/i })).toBeVisible();
+    expect(screen.getByTestId("chart")).toHaveAccessibleName(
+      "AAPL candlestick chart for 1d at 1m intervals. Latest close 210.10. Freshness FRESH.",
+    );
+    expect(fetchHistory).toHaveBeenCalledWith(
+      "http://api.test",
+      "instrument-aapl",
+      "1m",
+      "1d",
+      expect.any(AbortSignal),
+    );
     expect(stream.factory).toHaveBeenCalledTimes(1);
   });
 
@@ -216,6 +228,7 @@ describe("ChartPanel", () => {
     expect(chart).toHaveTextContent('"timestamp":"2026-07-24T15:31:00Z"');
     expect(chart).not.toHaveTextContent("999.00");
     expect(chart).not.toHaveTextContent("888.00");
+    expect(chart).toHaveAccessibleName(/Latest close 210\.30/);
   });
 
   it("aborts requests and closes streams when parameters change or the panel unmounts", async () => {
@@ -223,7 +236,7 @@ describe("ChartPanel", () => {
     const fetchHistory = vi.fn<NonNullable<ChartPanelProps["fetchHistory"]>>(
       (
         _baseUrl: string,
-        _symbol: string,
+        _instrumentId: string,
         interval: CandleInterval,
         period: ChartPeriod,
         signal: AbortSignal,
@@ -256,7 +269,9 @@ describe("ChartPanel", () => {
       <StrictMode>
         <ChartPanel
           apiBaseUrl="http://api.test"
-          symbol="AAPL"
+          instrumentId="instrument-aapl"
+          initialInterval="1m"
+          initialPeriod="1d"
           ChartComponent={FakeChart}
           createStream={stream.factory}
           fetchHistory={vi.fn().mockResolvedValue(response())}
@@ -295,7 +310,9 @@ describe("ChartPanel", () => {
       .mockResolvedValueOnce(response());
     renderPanel({ createStream: createStreamHarness().factory, fetchHistory });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load AAPL chart");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not load this instrument's chart",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Retry chart" }));
 
     expect(await screen.findByTestId("chart")).toBeVisible();
@@ -322,6 +339,7 @@ describe("ChartPanel", () => {
     await screen.findByTestId("chart");
 
     expect(screen.getByText(/data is stale/i)).toBeVisible();
+    expect(screen.getByTestId("chart")).toHaveAccessibleName(/Freshness STALE/);
     act(() => stream.connections[0]!.handlers.onDisconnected());
     expect(screen.getByText(/reconnecting/i)).toBeVisible();
     expect(screen.getByTestId("chart")).toBeVisible();

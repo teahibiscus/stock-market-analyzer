@@ -112,6 +112,8 @@ def _client(provider: FiniteStreamProvider, state: ContextState) -> TestClient:
 def _events(response_text: str) -> list[dict[str, object]]:
     events: list[dict[str, object]] = []
     for block in response_text.strip().split("\n\n"):
+        if block.startswith(":"):
+            continue
         lines = block.splitlines()
         events.append(
             {
@@ -140,6 +142,7 @@ def test_stream_endpoint_emits_ordered_parseable_events_and_closes_context() -> 
     assert response.headers["content-type"].startswith("text/event-stream")
     assert response.headers["cache-control"] == "no-cache"
     assert response.headers["x-accel-buffering"] == "no"
+    assert response.text.startswith(": heartbeat\n\n")
     assert [event["event"] for event in events] == ["candle", "candle"]
     assert [event["id"] for event in events] == ["1", "2"]
     assert [event["data"]["sequence"] for event in events] == [1, 2]  # type: ignore[index]

@@ -19,6 +19,10 @@ class MarketDataDependencyError(MarketDataProviderError):
     """An external market-data dependency is unavailable."""
 
 
+class MarketDataPersistenceError(MarketDataProviderError):
+    """Canonical market-data persistence could not complete an operation."""
+
+
 @runtime_checkable
 class MarketDataProvider(Protocol):
     def get_candles(

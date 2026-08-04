@@ -91,7 +91,7 @@ def test_history_endpoint_returns_ordered_canonical_demo_response() -> None:
     )
     assert payload["candles"][1]["close"] == "210.25"
     assert payload["metadata"]["state"] == "SUCCESS"
-    assert payload["metadata"]["freshness"]["state"] == "FRESH"
+    assert payload["metadata"]["freshness"]["state"] == "STALE"
 
 
 def test_history_endpoint_returns_empty_application_state() -> None:

@@ -25,7 +25,9 @@ type StreamViewState = "idle" | "connecting" | "connected" | "disconnected" | "e
 
 export type ChartPanelProps = {
   apiBaseUrl: string;
-  symbol: string;
+  instrumentId: string;
+  initialInterval?: CandleInterval;
+  initialPeriod?: ChartPeriod;
   fetchHistory?: typeof fetchCandles;
   createStream?: typeof createCandleStream;
   ChartComponent?: ComponentType<CandlestickChartProps>;
@@ -52,13 +54,19 @@ const PERIOD_LABELS: Record<ChartPeriod, string> = {
 
 export function ChartPanel({
   apiBaseUrl,
-  symbol,
+  instrumentId,
+  initialInterval = "1d",
+  initialPeriod = "1y",
   fetchHistory = fetchCandles,
   createStream = createCandleStream,
   ChartComponent = CandlestickChart,
 }: ChartPanelProps) {
-  const [interval, setInterval] = useState<CandleInterval>("1m");
-  const [period, setPeriod] = useState<ChartPeriod>("1d");
+  const [interval, setInterval] = useState<CandleInterval>(initialInterval);
+  const [period, setPeriod] = useState<ChartPeriod>(
+    isCombinationSupported(initialInterval, initialPeriod)
+      ? initialPeriod
+      : (supportedPeriodsForInterval(initialInterval)[0] ?? initialPeriod),
+  );
   const [retrySequence, setRetrySequence] = useState(0);
   const [historyState, setHistoryState] = useState<HistoryViewState>("loading");
   const [streamState, setStreamState] = useState<StreamViewState>("idle");
@@ -81,7 +89,7 @@ export function ChartPanel({
     setCandles([]);
     setHistory(null);
 
-    void fetchHistory(apiBaseUrl, symbol, interval, period, controller.signal)
+    void fetchHistory(apiBaseUrl, instrumentId, interval, period, controller.signal)
       .then((response) => {
         if (controller.signal.aborted || requestSequence.current !== requestId) {
           return;
@@ -96,7 +104,7 @@ export function ChartPanel({
         setCandles(response.candles);
         setHistoryState("ready");
         setStreamState("connecting");
-        connection = createStream(apiBaseUrl, symbol, interval, {
+        connection = createStream(apiBaseUrl, response.symbol, interval, {
           onOpen: () => {
             if (requestSequence.current !== requestId) {
               return;
@@ -150,7 +158,7 @@ export function ChartPanel({
         requestSequence.current += 1;
       }
     };
-  }, [apiBaseUrl, createStream, fetchHistory, interval, period, retrySequence, symbol]);
+  }, [apiBaseUrl, createStream, fetchHistory, instrumentId, interval, period, retrySequence]);
 
   function changeInterval(nextInterval: CandleInterval) {
     setInterval(nextInterval);
@@ -161,13 +169,16 @@ export function ChartPanel({
 
   const freshnessState = history?.metadata.freshness?.state;
   const isStale = freshnessState === "STALE" || freshnessState === "DELAYED";
+  const displaySymbol = history?.symbol;
+  const latestClose = candles.at(-1)?.close;
 
   return (
     <section className="chart-panel" aria-labelledby="chart-panel-title">
       <div className="chart-panel-heading">
         <div>
           <h2 id="chart-panel-title">
-            {symbol} candlestick chart · {interval} · {period}
+            {displaySymbol ? `${displaySymbol} candlestick chart` : "Candlestick chart"} ·{" "}
+            {interval} · {period}
           </h2>
           <p>Historical OHLCV candles with continuously updating demo prices.</p>
         </div>
@@ -205,13 +216,15 @@ export function ChartPanel({
         </div>
       </div>
 
-      {historyState === "loading" ? <Loading message={`Loading ${symbol} chart…`} /> : null}
+      {historyState === "loading" ? <Loading message="Loading chart…" /> : null}
       {historyState === "empty" ? (
-        <Empty message={`No candle data is available for ${symbol} at this timeframe.`} />
+        <Empty
+          message={`No candle data is available for ${displaySymbol ?? "this instrument"} at this timeframe.`}
+        />
       ) : null}
       {historyState === "error" ? (
         <div className="chart-message">
-          <ErrorState message={`Could not load ${symbol} chart. Try again.`} />
+          <ErrorState message="Could not load this instrument's chart. Try again." />
           <button type="button" onClick={() => setRetrySequence((value) => value + 1)}>
             Retry chart
           </button>
@@ -245,7 +258,7 @@ export function ChartPanel({
           ) : null}
           <ChartComponent
             candles={candles}
-            accessibleLabel={`${symbol} candlestick chart for ${period} at ${interval} intervals`}
+            accessibleLabel={`${displaySymbol ?? "Instrument"} candlestick chart for ${period} at ${interval} intervals. Latest close ${latestClose ?? "unavailable"}. Freshness ${freshnessState ?? "UNKNOWN"}.`}
             className="candlestick-chart"
           />
         </>

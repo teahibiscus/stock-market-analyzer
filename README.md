@@ -15,17 +15,19 @@ implemented:
 - Structured logging and correlation-ID middleware
 - Next.js application shell with typed API client and accessible state components
 - Backend health probe on the home page
-- Worker and scheduler entry-point placeholders
+- Worker backfill command and scheduler entry-point placeholder
 - Shared application-state, freshness, typed-error, identifier, and time contracts
 - Instrument domain and provider port with deterministic local reference data
 - Alembic-managed `instruments` schema with exchanges, instruments, symbols, and search indexes
 - SQLAlchemy instrument repository with symbol and company-name matching
 - `GET /api/v1/instruments/search` with validation, typed states, errors, and telemetry
 - Accessible search UI with debounce, cancellation, retry, result selection, and responsive layout
-- AAPL OHLCV candlestick chart with historical demo candles and SSE updates
+- PostgreSQL-backed raw OHLCV bars with idempotent demo-data backfill
+- Canonical `GET /api/v1/charts/{instrument_id}` chart read path with read-through persistence
+- Search-to-chart navigation for every seeded instrument and bounded SSE demo updates
 - Interval and period controls with compatibility enforcement and responsive chart sizing
 
-The database-backed instrument-search slice and the first AAPL candlestick-chart slice are complete.
+The database-backed instrument-search and persisted candlestick-chart vertical slices are complete.
 
 ## Prerequisites
 
@@ -115,9 +117,10 @@ npm run dev --workspace frontend
 ```
 
 Open `http://localhost:3000` (primary) or `http://127.0.0.1:3000` to use instrument search,
-the AAPL chart, and the backend health probe. The backend CORS allow-list permits both local origins.
+select an instrument, open its chart, and view the backend health probe. The backend CORS allow-list
+permits both local origins.
 
-## Run the AAPL chart locally
+## Run the chart locally
 
 Create `.env`, start dependencies, and apply migrations from the repository root:
 
@@ -125,6 +128,7 @@ Create `.env`, start dependencies, and apply migrations from the repository root
 Copy-Item .env.example .env
 docker compose up -d --wait
 .\.venv\Scripts\alembic.exe -c backend/alembic.ini upgrade head
+.\.venv\Scripts\python.exe -m stock_market_analyzer.worker backfill --interval 1d --period 1y
 ```
 
 Start the backend in one terminal:
@@ -139,13 +143,15 @@ Start the frontend in another terminal:
 npm run dev --workspace frontend
 ```
 
-The home page loads AAPL historical OHLCV candles and continuously replaces the active candle from
-an SSE stream. All chart prices are **simulated demo data, not live exchange market data**.
+Search for a seeded instrument and select it. The application navigates to a URL-addressable chart,
+loads canonical bars from PostgreSQL, and continuously replaces the active candle from a bounded SSE
+stream. All chart prices are **simulated demo data, not live exchange market data**. Demo responses
+are explicitly marked `STALE` with a `SYNTHETIC_MARKET_DATA` warning.
 
 History and stream endpoints:
 
 ```text
-GET http://127.0.0.1:8000/api/v1/market-data/candles?symbol=AAPL&interval=1m&period=1d
+GET http://127.0.0.1:8000/api/v1/charts/00000000-0000-4000-8000-000000000002?interval=1d&period=1y
 GET http://127.0.0.1:8000/api/v1/market-data/stream?symbol=AAPL&interval=1m
 ```
 
@@ -154,8 +160,9 @@ Supported intervals are `1m`, `2m`, `5m`, `15m`, `30m`, `1h`, and `1d`. Supporte
 does not support. Changing to an interval incompatible with the selected period automatically picks
 that interval's first compatible period.
 
-Known chart limitations: there is no production market-data provider, entitlement enforcement,
-stream heartbeat, or missed-event replay.
+Known chart limitations: there is no production market-data provider, entitlement enforcement, or
+missed-event replay. The SSE endpoint is demo-only and bounded by connection-count and duration
+limits.
 
 ## Test the vertical slice locally
 
@@ -231,6 +238,10 @@ their schemas; they do not access another module's private tables.
 PostgreSQL is the MVP system of record. Redis is disposable and is used only for caching, rate limits,
 and short-lived read acceleration. External identity and market-data systems will be isolated behind
 ports and adapters so vendor DTOs do not leak into canonical domain contracts.
+
+The MVP remains a responsive web application. Chart state is URL-addressable so a future Tauri
+desktop shell can be evaluated if validated users require multi-window or multi-monitor workflows;
+desktop packaging and offline storage are intentionally postponed.
 
 The initial directory layout is intentionally small:
 

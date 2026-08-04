@@ -17,7 +17,8 @@ from stock_market_analyzer.modules.application_state.domain.metadata import (
 from stock_market_analyzer.modules.market_data.domain.candle import Candle
 from stock_market_analyzer.modules.market_data.domain.timeframe import Interval, Period
 
-DEMO_DATA_WARNING = "Simulated demo data; this is not live exchange market data."
+DEMO_DATA_WARNING = "SYNTHETIC_MARKET_DATA"
+READ_THROUGH_WARNING = "MARKET_DATA_READ_THROUGH"
 
 
 class CandleSchema(BaseModel):
@@ -43,11 +44,15 @@ class CandleSchema(BaseModel):
 class CandleSeriesResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
+    instrument_id: str | None = Field(default=None, serialization_alias="instrumentId")
     symbol: str
     interval: Interval
     period: Period
     timezone: Literal["UTC"] = "UTC"
     data_source: str = Field(serialization_alias="dataSource")
+    adjustment_mode: Literal["RAW"] = Field(default="RAW", serialization_alias="adjustmentMode")
+    adjustment_version: int = Field(default=1, serialization_alias="adjustmentVersion")
+    schema_version: int = Field(default=1, serialization_alias="schemaVersion")
     as_of: datetime = Field(serialization_alias="asOf")
     candles: list[CandleSchema]
     metadata: ApplicationStateMetadata
@@ -62,9 +67,17 @@ class CandleSeriesResponse(BaseModel):
         data_source: str,
         as_of: datetime,
         candles: list[Candle],
+        instrument_id: str | None = None,
+        read_through: bool = False,
     ) -> CandleSeriesResponse:
         has_candles = bool(candles)
+        is_demo = data_source.casefold() == "demo"
+        provider_timestamp = candles[-1].timestamp if candles else None
+        warnings = [DEMO_DATA_WARNING] if is_demo else []
+        if read_through:
+            warnings.append(READ_THROUGH_WARNING)
         return cls(
+            instrument_id=instrument_id,
             symbol=symbol,
             interval=interval,
             period=period,
@@ -78,12 +91,16 @@ class CandleSeriesResponse(BaseModel):
                 ),
                 recoverable=not has_candles,
                 freshness=FreshnessMetadata(
-                    provider_timestamp=as_of,
+                    provider_timestamp=provider_timestamp,
                     ingested_at=as_of,
-                    delay_seconds=0,
-                    state=FreshnessState.FRESH,
+                    delay_seconds=(
+                        max(0, int((as_of - provider_timestamp).total_seconds()))
+                        if provider_timestamp is not None
+                        else None
+                    ),
+                    state=FreshnessState.STALE if is_demo else FreshnessState.FRESH,
                 ),
-                warnings=[DEMO_DATA_WARNING],
+                warnings=warnings,
             ),
         )
 

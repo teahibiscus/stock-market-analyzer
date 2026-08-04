@@ -18,6 +18,9 @@ from stock_market_analyzer.app.api.exception_handlers import (
 )
 from stock_market_analyzer.app.api.router import api_v1_router
 from stock_market_analyzer.app.api.routes.health import create_health_router
+from stock_market_analyzer.app.composition_root.instrument_resolver import (
+    SqlAlchemyInstrumentResolver,
+)
 from stock_market_analyzer.app.middleware.correlation_id import CorrelationIdMiddleware
 from stock_market_analyzer.config.settings import Settings, get_settings
 from stock_market_analyzer.modules.instruments.api.router import (
@@ -31,12 +34,19 @@ from stock_market_analyzer.modules.instruments.ports.instrument_reference_provid
     InstrumentReferenceProvider,
 )
 from stock_market_analyzer.modules.market_data.api.router import (
+    CandleRepositoryFactory,
+    InstrumentResolverFactory,
     MarketDataProviderFactory,
     create_market_data_router,
+)
+from stock_market_analyzer.modules.market_data.infrastructure.persistence.repository import (
+    SqlAlchemyCandleRepository,
 )
 from stock_market_analyzer.modules.market_data.infrastructure.provider.demo_provider import (
     DemoMarketDataProvider,
 )
+from stock_market_analyzer.modules.market_data.ports.candle_repository import CandleRepository
+from stock_market_analyzer.modules.market_data.ports.instrument_resolver import InstrumentResolver
 from stock_market_analyzer.modules.market_data.ports.market_data_provider import (
     MarketDataProvider,
 )
@@ -63,11 +73,8 @@ def create_app(
     resolved_settings = settings or get_settings()
     configure_logging(resolved_settings)
 
-    database_engine = None
-    if database_health_checker is None or instrument_reference_provider is None:
-        database_engine = create_database_engine(resolved_settings)
+    database_engine = create_database_engine(resolved_settings)
     if database_health_checker is None:
-        assert database_engine is not None
         database_health_checker = partial(check_database_health, database_engine)
 
     if cache_health_checker is None:
@@ -77,7 +84,6 @@ def create_app(
     if instrument_reference_provider is not None:
         provider_factory = _constant_provider_factory(instrument_reference_provider)
     else:
-        assert database_engine is not None
         provider_factory = _repository_provider_factory(database_engine)
 
     market_data_provider_factory = _constant_market_data_provider_factory(
@@ -122,6 +128,10 @@ def create_app(
             provider_factory=market_data_provider_factory,
             data_source=resolved_settings.market_data_source,
             stream_interval_seconds=resolved_settings.market_data_stream_interval_seconds,
+            repository_factory=_candle_repository_factory(database_engine),
+            instrument_resolver_factory=_instrument_resolver_factory(database_engine),
+            stream_max_seconds=resolved_settings.market_data_stream_max_seconds,
+            stream_max_connections=resolved_settings.market_data_stream_max_connections,
         ),
         prefix="/api/v1",
     )
@@ -160,5 +170,27 @@ def _repository_provider_factory(engine: Engine) -> InstrumentProviderFactory:
     def provide() -> Iterator[InstrumentReferenceProvider]:
         with database_session_factory() as session:
             yield SqlAlchemyInstrumentRepository(session)
+
+    return provide
+
+
+def _candle_repository_factory(engine: Engine) -> CandleRepositoryFactory:
+    database_session_factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    @contextmanager
+    def provide() -> Iterator[CandleRepository]:
+        with database_session_factory() as session:
+            yield SqlAlchemyCandleRepository(session)
+
+    return provide
+
+
+def _instrument_resolver_factory(engine: Engine) -> InstrumentResolverFactory:
+    database_session_factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    @contextmanager
+    def provide() -> Iterator[InstrumentResolver]:
+        with database_session_factory() as session:
+            yield SqlAlchemyInstrumentResolver(session)
 
     return provide

@@ -18,7 +18,7 @@ from stock_market_analyzer.modules.market_data.ports.market_data_provider import
 )
 
 HISTORY_CANDLE_LIMIT = 500
-_SUPPORTED_SYMBOL = "AAPL"
+_SUPPORTED_SYMBOLS = frozenset({"AAPL", "MSFT", "GOOGL", "AMZN", "A", "SPY"})
 _CENT = Decimal("0.01")
 _MINIMUM_PRICE = Decimal("0.01")
 _BASE_PRICE = Decimal("210.00")
@@ -123,7 +123,7 @@ class DemoMarketDataProvider:
 
 def _normalize_symbol(symbol: str) -> str:
     normalized_symbol = symbol.strip().upper()
-    if normalized_symbol != _SUPPORTED_SYMBOL:
+    if normalized_symbol not in _SUPPORTED_SYMBOLS:
         raise SymbolNotSupportedError(f"Symbol {normalized_symbol or symbol!r} is not supported.")
     return normalized_symbol
 

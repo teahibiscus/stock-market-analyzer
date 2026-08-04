@@ -62,7 +62,7 @@ export function isCombinationSupported(interval: CandleInterval, period: ChartPe
 
 export async function fetchCandles(
   baseUrl: string,
-  symbol: string,
+  instrumentId: string,
   interval: CandleInterval,
   period: ChartPeriod,
   signal: AbortSignal,
@@ -75,8 +75,9 @@ export async function fetchCandles(
     });
   }
 
-  const url = new URL(`${baseUrl.replace(/\/$/, "")}/api/v1/market-data/candles`);
-  url.searchParams.set("symbol", symbol.trim().toUpperCase());
+  const url = new URL(
+    `${baseUrl.replace(/\/$/, "")}/api/v1/charts/${encodeURIComponent(instrumentId)}`,
+  );
   url.searchParams.set("interval", interval);
   url.searchParams.set("period", period);
 
