@@ -28,6 +28,7 @@ dev = [
 
 [project.scripts]
 stock-market-analyzer-api = "stock_market_analyzer.app.main:run"
+stock-market-analyzer-worker = "stock_market_analyzer.worker.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

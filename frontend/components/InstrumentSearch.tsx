@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 
 import { Empty } from "@/components/state/Empty";
 import { ErrorState } from "@/components/state/ErrorState";
@@ -41,6 +42,7 @@ export function InstrumentSearch({
   onSelect,
   search = searchInstruments,
 }: InstrumentSearchProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [viewState, setViewState] = useState<SearchViewState>({ kind: "idle" });
@@ -140,6 +142,7 @@ export function InstrumentSearch({
   function selectInstrument(instrument: InstrumentSearchItem) {
     setSelectedInstrument(instrument);
     onSelect?.(instrument);
+    router.push(`/chart/${encodeURIComponent(instrument.instrumentId)}?interval=1d&period=1y`);
   }
 
   function handleResultKeyDown(

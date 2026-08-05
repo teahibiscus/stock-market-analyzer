@@ -188,7 +188,10 @@ def test_search_endpoint_logs_completion_without_query_text() -> None:
 
 def test_search_endpoint_allows_configured_frontend_origin() -> None:
     app = create_app(
-        settings=Settings(frontend_origin="http://127.0.0.1:3000"),
+        settings=Settings(
+            frontend_origin="http://127.0.0.1:3000",
+            frontend_additional_origin="http://localhost:3000",
+        ),
         database_health_checker=lambda: True,
         cache_health_checker=lambda: True,
         instrument_reference_provider=SeedInstrumentReferenceProvider(),
@@ -204,3 +207,73 @@ def test_search_endpoint_allows_configured_frontend_origin() -> None:
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:3000"
+
+
+def test_search_endpoint_allows_additional_frontend_origin() -> None:
+    app = create_app(
+        settings=Settings(
+            frontend_origin="http://127.0.0.1:3000",
+            frontend_additional_origin="http://localhost:3000",
+        ),
+        database_health_checker=lambda: True,
+        cache_health_checker=lambda: True,
+        instrument_reference_provider=SeedInstrumentReferenceProvider(),
+    )
+
+    response = TestClient(app).options(
+        "/api/v1/instruments/search",
+        headers={
+            "Access-Control-Request-Method": "GET",
+            "Origin": "http://localhost:3000",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+def test_search_endpoint_rejects_unconfigured_frontend_origin() -> None:
+    app = create_app(
+        settings=Settings(
+            frontend_origin="http://127.0.0.1:3000",
+            frontend_additional_origin="http://localhost:3000",
+        ),
+        database_health_checker=lambda: True,
+        cache_health_checker=lambda: True,
+        instrument_reference_provider=SeedInstrumentReferenceProvider(),
+    )
+
+    response = TestClient(app).options(
+        "/api/v1/instruments/search",
+        headers={
+            "Access-Control-Request-Method": "GET",
+            "Origin": "http://malicious.example",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers
+
+
+def test_market_data_stream_preflight_allows_get_from_localhost() -> None:
+    app = create_app(
+        settings=Settings(
+            frontend_origin="http://127.0.0.1:3000",
+            frontend_additional_origin="http://localhost:3000",
+        ),
+        database_health_checker=lambda: True,
+        cache_health_checker=lambda: True,
+        instrument_reference_provider=SeedInstrumentReferenceProvider(),
+    )
+
+    response = TestClient(app).options(
+        "/api/v1/market-data/stream",
+        headers={
+            "Access-Control-Request-Method": "GET",
+            "Origin": "http://localhost:3000",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert "GET" in response.headers["access-control-allow-methods"]

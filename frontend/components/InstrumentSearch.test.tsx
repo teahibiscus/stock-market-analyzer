@@ -5,6 +5,12 @@ import type { InstrumentSearchResponse, SearchInstrumentsFunction } from "@/lib/
 
 import { InstrumentSearch } from "./InstrumentSearch";
 
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push }),
+}));
+
 const successResponse: InstrumentSearchResponse = {
   items: [
     {
@@ -50,6 +56,7 @@ function deferred<T>() {
 
 afterEach(() => {
   vi.useRealTimers();
+  push.mockClear();
 });
 
 describe("InstrumentSearch", () => {
@@ -101,6 +108,7 @@ describe("InstrumentSearch", () => {
 
     expect(option).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Selected AAPL — Apple Inc.")).toBeVisible();
+    expect(push).toHaveBeenCalledWith("/chart/instrument-aapl?interval=1d&period=1y");
   });
 
   it("shows an actionable empty state", async () => {
