@@ -43,6 +43,9 @@ def test_market_data_openapi_contract_is_stable() -> None:
         == "#/components/schemas/CandleSeriesResponse"
     )
     assert "text/event-stream" in stream["responses"]["200"]["content"]
+    candle_schema = schema["components"]["schemas"]["CandleSchema"]
+    assert "volume" in candle_schema["required"]
+    assert candle_schema["properties"]["volume"]["type"] == "integer"
     assert schema["components"]["schemas"]["Interval"]["enum"] == [
         "1m",
         "2m",

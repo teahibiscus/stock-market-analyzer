@@ -138,6 +138,18 @@ button:disabled {
   padding: 0.55rem 0.75rem;
 }
 
+.chart-controls label.chart-toggle {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  align-self: end;
+  padding-block: 0.55rem;
+}
+
+.chart-toggle:has(input:disabled) {
+  opacity: 0.6;
+}
+
 .chart-statuses {
   display: flex;
   flex-wrap: wrap;

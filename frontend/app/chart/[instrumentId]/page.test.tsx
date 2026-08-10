@@ -10,6 +10,7 @@ vi.mock("@/components/ChartPanel", () => ({
     instrumentId: string;
     initialInterval: string;
     initialPeriod: string;
+    initialShowVolume: boolean;
   }) => <div data-testid="chart-panel">{JSON.stringify(props)}</div>,
 }));
 
@@ -36,8 +37,31 @@ describe("ChartPage", () => {
         instrumentId: "instrument-aapl",
         initialInterval: "1d",
         initialPeriod: "1y",
+        initialShowVolume: true,
       }),
     );
+  });
+
+  it("disables volume when the query opts out", async () => {
+    render(
+      await ChartPage({
+        params: Promise.resolve({ instrumentId: "instrument-aapl" }),
+        searchParams: Promise.resolve({ interval: "1d", period: "1y", volume: "0" }),
+      }),
+    );
+
+    expect(screen.getByTestId("chart-panel")).toHaveTextContent('"initialShowVolume":false');
+  });
+
+  it("keeps volume enabled for an explicit or unrecognised opt-in", async () => {
+    render(
+      await ChartPage({
+        params: Promise.resolve({ instrumentId: "instrument-aapl" }),
+        searchParams: Promise.resolve({ volume: "1" }),
+      }),
+    );
+
+    expect(screen.getByTestId("chart-panel")).toHaveTextContent('"initialShowVolume":true');
   });
 
   it("falls back to a compatible period for invalid query combinations", async () => {

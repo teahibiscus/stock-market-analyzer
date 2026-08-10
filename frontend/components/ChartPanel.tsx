@@ -8,6 +8,7 @@ import { Loading } from "@/components/state/Loading";
 import { CandlestickChart, type CandlestickChartProps } from "@/components/CandlestickChart";
 import { createCandleStream, type CandleStream } from "@/lib/candleStream";
 import { mergeCandleUpdate } from "@/lib/candleStore";
+import { hasVolumeData } from "@/lib/chartSeries";
 import {
   CANDLE_INTERVALS,
   CHART_PERIODS,
@@ -28,6 +29,7 @@ export type ChartPanelProps = {
   instrumentId: string;
   initialInterval?: CandleInterval;
   initialPeriod?: ChartPeriod;
+  initialShowVolume?: boolean;
   fetchHistory?: typeof fetchCandles;
   createStream?: typeof createCandleStream;
   ChartComponent?: ComponentType<CandlestickChartProps>;
@@ -43,6 +45,8 @@ const INTERVAL_LABELS: Record<CandleInterval, string> = {
   "1d": "1 day",
 };
 
+const VOLUME_FORMAT = new Intl.NumberFormat("en-US");
+
 const PERIOD_LABELS: Record<ChartPeriod, string> = {
   "1d": "1 day",
   "5d": "5 days",
@@ -57,6 +61,7 @@ export function ChartPanel({
   instrumentId,
   initialInterval = "1d",
   initialPeriod = "1y",
+  initialShowVolume = true,
   fetchHistory = fetchCandles,
   createStream = createCandleStream,
   ChartComponent = CandlestickChart,
@@ -67,6 +72,7 @@ export function ChartPanel({
       ? initialPeriod
       : (supportedPeriodsForInterval(initialInterval)[0] ?? initialPeriod),
   );
+  const [showVolume, setShowVolume] = useState(initialShowVolume);
   const [retrySequence, setRetrySequence] = useState(0);
   const [historyState, setHistoryState] = useState<HistoryViewState>("loading");
   const [streamState, setStreamState] = useState<StreamViewState>("idle");
@@ -167,10 +173,24 @@ export function ChartPanel({
     }
   }
 
+  function changeVolumeVisibility(nextShowVolume: boolean) {
+    setShowVolume(nextShowVolume);
+    const url = new URL(window.location.href);
+    url.searchParams.set("volume", nextShowVolume ? "1" : "0");
+    window.history.replaceState(window.history.state, "", url);
+  }
+
   const freshnessState = history?.metadata.freshness?.state;
   const isStale = freshnessState === "STALE" || freshnessState === "DELAYED";
   const displaySymbol = history?.symbol;
   const latestClose = candles.at(-1)?.close;
+  const volumeAvailable = hasVolumeData(candles);
+  const volumeVisible = showVolume && volumeAvailable;
+  const latestVolume = candles.at(-1)?.volume;
+  const volumeLabel =
+    volumeVisible && latestVolume !== undefined
+      ? ` Latest volume ${VOLUME_FORMAT.format(latestVolume)}.`
+      : "";
 
   return (
     <section className="chart-panel" aria-labelledby="chart-panel-title">
@@ -213,6 +233,15 @@ export function ChartPanel({
               ))}
             </select>
           </label>
+          <label className="chart-toggle">
+            <input
+              type="checkbox"
+              checked={showVolume}
+              disabled={historyState === "ready" && !volumeAvailable}
+              onChange={(event) => changeVolumeVisibility(event.target.checked)}
+            />
+            Show volume
+          </label>
         </div>
       </div>
 
@@ -247,6 +276,11 @@ export function ChartPanel({
                 Live updates disconnected; reconnecting…
               </span>
             ) : null}
+            {volumeAvailable ? null : (
+              <span className="chart-badge chart-badge-warning">
+                Volume data is unavailable for this timeframe.
+              </span>
+            )}
           </div>
           {streamState === "error" ? (
             <div className="chart-message">
@@ -258,7 +292,8 @@ export function ChartPanel({
           ) : null}
           <ChartComponent
             candles={candles}
-            accessibleLabel={`${displaySymbol ?? "Instrument"} candlestick chart for ${period} at ${interval} intervals. Latest close ${latestClose ?? "unavailable"}. Freshness ${freshnessState ?? "UNKNOWN"}.`}
+            showVolume={volumeVisible}
+            accessibleLabel={`${displaySymbol ?? "Instrument"} candlestick chart for ${period} at ${interval} intervals. Latest close ${latestClose ?? "unavailable"}.${volumeLabel} Freshness ${freshnessState ?? "UNKNOWN"}.`}
             className="candlestick-chart"
           />
         </>

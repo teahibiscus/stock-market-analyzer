@@ -72,12 +72,14 @@ function deferred<T>() {
 function FakeChart({
   candles,
   accessibleLabel,
+  showVolume,
 }: {
   candles: readonly MarketCandle[];
   accessibleLabel: string;
+  showVolume?: boolean;
 }) {
   return (
-    <div data-testid="chart" aria-label={accessibleLabel}>
+    <div data-testid="chart" aria-label={accessibleLabel} data-show-volume={String(showVolume)}>
       {JSON.stringify(candles)}
     </div>
   );
@@ -151,7 +153,7 @@ describe("ChartPanel", () => {
     expect(screen.getByText(/simulated demo data/i)).toBeVisible();
     expect(screen.getByRole("heading", { name: /AAPL.*1m.*1d/i })).toBeVisible();
     expect(screen.getByTestId("chart")).toHaveAccessibleName(
-      "AAPL candlestick chart for 1d at 1m intervals. Latest close 210.10. Freshness FRESH.",
+      "AAPL candlestick chart for 1d at 1m intervals. Latest close 210.10. Latest volume 100. Freshness FRESH.",
     );
     expect(fetchHistory).toHaveBeenCalledWith(
       "http://api.test",
@@ -378,5 +380,138 @@ describe("ChartPanel", () => {
 
     expect(screen.getByTestId("chart")).toHaveTextContent("222.00");
     expect(screen.getByTestId("chart")).not.toHaveTextContent("111.00");
+  });
+
+  it("shows volume by default and reports the latest volume in the chart label", async () => {
+    renderPanel({
+      createStream: createStreamHarness().factory,
+      fetchHistory: vi.fn().mockResolvedValue(response()),
+    });
+    await screen.findByTestId("chart");
+
+    expect(screen.getByRole("checkbox", { name: "Show volume" })).toBeChecked();
+    expect(screen.getByTestId("chart")).toHaveAttribute("data-show-volume", "true");
+    expect(screen.getByTestId("chart")).toHaveAccessibleName(/Latest volume 100\./);
+  });
+
+  it("keeps the volume preference checked while history is still loading", async () => {
+    const request = deferred<CandleHistoryResponse>();
+    renderPanel({
+      createStream: createStreamHarness().factory,
+      fetchHistory: vi.fn().mockReturnValue(request.promise),
+      initialShowVolume: true,
+    });
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading chart");
+    expect(screen.getByRole("checkbox", { name: "Show volume" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Show volume" })).toBeEnabled();
+
+    await act(async () => {
+      request.resolve(response());
+      await request.promise;
+    });
+    await screen.findByTestId("chart");
+  });
+
+  it("hides volume without refetching or losing candles when the toggle is cleared", async () => {
+    window.history.replaceState({}, "", "/chart/instrument-aapl?interval=1m&period=1d&volume=1");
+    const fetchHistory: NonNullable<ChartPanelProps["fetchHistory"]> = vi
+      .fn()
+      .mockResolvedValue(response());
+    renderPanel({ createStream: createStreamHarness().factory, fetchHistory });
+    await screen.findByTestId("chart");
+    expect(fetchHistory).toHaveBeenCalledTimes(1);
+
+    const toggle = screen.getByRole("checkbox", { name: "Show volume" });
+    fireEvent.click(toggle);
+
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByTestId("chart")).toHaveAttribute("data-show-volume", "false");
+    expect(new URLSearchParams(window.location.search).get("volume")).toBe("0");
+    expect(screen.getByTestId("chart")).toHaveTextContent('"close":"210.10"');
+    expect(screen.getByTestId("chart")).toHaveAccessibleName(
+      "AAPL candlestick chart for 1d at 1m intervals. Latest close 210.10. Freshness FRESH.",
+    );
+    expect(screen.getByRole("combobox", { name: "Candle interval" })).toHaveValue("1m");
+    expect(screen.getByRole("combobox", { name: "Chart period" })).toHaveValue("1d");
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toBeChecked();
+    expect(screen.getByTestId("chart")).toHaveAttribute("data-show-volume", "true");
+    expect(new URLSearchParams(window.location.search).get("volume")).toBe("1");
+    expect(fetchHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it("honours an initial volume preference", async () => {
+    renderPanel({
+      createStream: createStreamHarness().factory,
+      fetchHistory: vi.fn().mockResolvedValue(response()),
+      initialShowVolume: false,
+    });
+    await screen.findByTestId("chart");
+
+    expect(screen.getByRole("checkbox", { name: "Show volume" })).not.toBeChecked();
+    expect(screen.getByTestId("chart")).toHaveAttribute("data-show-volume", "false");
+  });
+
+  it("explains unavailable volume and disables the toggle without hiding prices", async () => {
+    renderPanel({
+      createStream: createStreamHarness().factory,
+      fetchHistory: vi
+        .fn()
+        .mockResolvedValue(response({ candles: [{ ...firstCandle, volume: 0 }] })),
+    });
+    await screen.findByTestId("chart");
+
+    expect(screen.getByText(/volume data is unavailable/i)).toBeVisible();
+    const toggle = screen.getByRole("checkbox", { name: "Show volume" });
+    expect(toggle).toBeChecked();
+    expect(toggle).toBeDisabled();
+    expect(screen.getByTestId("chart")).toHaveAttribute("data-show-volume", "false");
+    expect(screen.getByTestId("chart")).toHaveTextContent('"close":"210.10"');
+    expect(screen.getByTestId("chart")).toHaveAccessibleName(
+      "AAPL candlestick chart for 1d at 1m intervals. Latest close 210.10. Freshness FRESH.",
+    );
+  });
+
+  it("toggles volume from the keyboard without refetching history", async () => {
+    const fetchHistory: NonNullable<ChartPanelProps["fetchHistory"]> = vi
+      .fn()
+      .mockResolvedValue(response());
+    renderPanel({ createStream: createStreamHarness().factory, fetchHistory });
+    await screen.findByTestId("chart");
+
+    const toggle = screen.getByRole("checkbox", { name: "Show volume" });
+    toggle.focus();
+    expect(toggle).toHaveFocus();
+
+    fireEvent.keyDown(toggle, { key: " ", code: "Space" });
+    fireEvent.click(toggle);
+
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByTestId("chart")).toHaveAttribute("data-show-volume", "false");
+
+    fireEvent.keyDown(toggle, { key: "Enter", code: "Enter" });
+    fireEvent.click(toggle);
+
+    expect(toggle).toBeChecked();
+    expect(screen.getByTestId("chart")).toHaveAttribute("data-show-volume", "true");
+    expect(fetchHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the volume label in step with streamed updates", async () => {
+    const stream = createStreamHarness();
+    renderPanel({
+      createStream: stream.factory,
+      fetchHistory: vi.fn().mockResolvedValue(response()),
+    });
+    await screen.findByTestId("chart");
+
+    act(() => {
+      stream.connections[0]!.handlers.onUpdate(update({ close: "210.20", volume: 4200 }));
+    });
+
+    expect(screen.getByTestId("chart")).toHaveAccessibleName(/Latest volume 4,200\./);
   });
 });
