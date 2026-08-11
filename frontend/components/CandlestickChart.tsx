@@ -4,26 +4,34 @@ import { useEffect, useRef } from "react";
 import {
   CandlestickSeries,
   ColorType,
+  HistogramSeries,
   createChart,
-  type CandlestickData,
   type ISeriesApi,
-  type UTCTimestamp,
 } from "lightweight-charts";
 
+import { seriesChanged, toPriceSeries, toVolumeSeries } from "@/lib/chartSeries";
 import type { MarketCandle } from "@/lib/marketData";
 
 export type CandlestickChartProps = {
   candles: readonly MarketCandle[];
   accessibleLabel: string;
+  showVolume?: boolean;
   className?: string;
 };
 
-type ChartCandle = CandlestickData<UTCTimestamp>;
+const PRICE_MARGINS_WITH_VOLUME = { top: 0.1, bottom: 0.3 };
+const PRICE_MARGINS_WITHOUT_VOLUME = { top: 0.1, bottom: 0.1 };
 
-export function CandlestickChart({ candles, accessibleLabel, className }: CandlestickChartProps) {
+export function CandlestickChart({
+  candles,
+  accessibleLabel,
+  showVolume = true,
+  className,
+}: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const previousDataRef = useRef<ChartCandle[]>([]);
+  const priceSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const previousCandlesRef = useRef<readonly MarketCandle[]>([]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -49,13 +57,24 @@ export function CandlestickChart({ candles, accessibleLabel, className }: Candle
         secondsVisible: false,
       },
     });
-    seriesRef.current = chart.addSeries(CandlestickSeries, {
+    priceSeriesRef.current = chart.addSeries(CandlestickSeries, {
       upColor: "#22c55e",
       downColor: "#ef4444",
       borderUpColor: "#22c55e",
       borderDownColor: "#ef4444",
       wickUpColor: "#22c55e",
       wickDownColor: "#ef4444",
+    });
+    // An empty price scale id keeps volume as an overlay pinned to the lower band
+    // of the same pane rather than competing with the price scale.
+    volumeSeriesRef.current = chart.addSeries(HistogramSeries, {
+      priceScaleId: "",
+      priceFormat: { type: "volume" },
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+    volumeSeriesRef.current.priceScale().applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
     });
 
     const resize = () => {
@@ -69,68 +88,48 @@ export function CandlestickChart({ candles, accessibleLabel, className }: Candle
 
     return () => {
       observer?.disconnect();
-      seriesRef.current = null;
-      previousDataRef.current = [];
+      priceSeriesRef.current = null;
+      volumeSeriesRef.current = null;
+      previousCandlesRef.current = [];
       chart.remove();
     };
   }, []);
 
   useEffect(() => {
-    const series = seriesRef.current;
-    if (series === null) {
+    const volumeSeries = volumeSeriesRef.current;
+    const priceSeries = priceSeriesRef.current;
+    if (volumeSeries === null || priceSeries === null) {
       return;
     }
 
-    const nextData = candles.map(toChartCandle);
-    const previousData = previousDataRef.current;
-    if (canUpdateLast(previousData, nextData)) {
-      series.update(nextData.at(-1)!);
-    } else if (canAppend(previousData, nextData)) {
-      series.update(nextData.at(-1)!);
-    } else {
-      series.setData(nextData);
+    volumeSeries.applyOptions({ visible: showVolume });
+    priceSeries.priceScale().applyOptions({
+      scaleMargins: showVolume ? PRICE_MARGINS_WITH_VOLUME : PRICE_MARGINS_WITHOUT_VOLUME,
+    });
+  }, [showVolume]);
+
+  useEffect(() => {
+    const priceSeries = priceSeriesRef.current;
+    const volumeSeries = volumeSeriesRef.current;
+    if (priceSeries === null || volumeSeries === null) {
+      return;
     }
-    previousDataRef.current = nextData;
+
+    const change = seriesChanged(previousCandlesRef.current, candles);
+    if (change === "none") {
+      return;
+    }
+
+    if (change === "reset") {
+      priceSeries.setData(toPriceSeries(candles));
+      volumeSeries.setData(toVolumeSeries(candles));
+    } else {
+      priceSeries.update(toPriceSeries(candles).at(-1)!);
+      volumeSeries.update(toVolumeSeries(candles).at(-1)!);
+    }
+
+    previousCandlesRef.current = candles;
   }, [candles]);
 
   return <div ref={containerRef} className={className} role="img" aria-label={accessibleLabel} />;
-}
-
-function toChartCandle(candle: MarketCandle): ChartCandle {
-  return {
-    time: Math.floor(Date.parse(candle.timestamp) / 1_000) as UTCTimestamp,
-    open: Number(candle.open),
-    high: Number(candle.high),
-    low: Number(candle.low),
-    close: Number(candle.close),
-  };
-}
-
-function canUpdateLast(previous: ChartCandle[], next: ChartCandle[]): boolean {
-  return (
-    previous.length > 0 &&
-    previous.length === next.length &&
-    previous.at(-1)?.time === next.at(-1)?.time &&
-    equalCandles(previous.slice(0, -1), next.slice(0, -1))
-  );
-}
-
-function canAppend(previous: ChartCandle[], next: ChartCandle[]): boolean {
-  return (
-    previous.length > 0 &&
-    next.length === previous.length + 1 &&
-    equalCandles(previous, next.slice(0, -1)) &&
-    Number(next.at(-1)?.time) > Number(previous.at(-1)?.time)
-  );
-}
-
-function equalCandles(left: ChartCandle[], right: ChartCandle[]): boolean {
-  return left.every(
-    (candle, index) =>
-      candle.time === right[index]?.time &&
-      candle.open === right[index]?.open &&
-      candle.high === right[index]?.high &&
-      candle.low === right[index]?.low &&
-      candle.close === right[index]?.close,
-  );
 }

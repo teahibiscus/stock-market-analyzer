@@ -26,6 +26,7 @@ implemented:
 - Canonical `GET /api/v1/charts/{instrument_id}` chart read path with read-through persistence
 - Search-to-chart navigation for every seeded instrument and bounded SSE demo updates
 - Interval and period controls with compatibility enforcement and responsive chart sizing
+- Volume histogram overlay with a keyboard-accessible toggle and an unavailable-volume state
 
 The database-backed instrument-search and persisted candlestick-chart vertical slices are complete.
 
@@ -160,9 +161,21 @@ Supported intervals are `1m`, `2m`, `5m`, `15m`, `30m`, `1h`, and `1d`. Supporte
 does not support. Changing to an interval incompatible with the selected period automatically picks
 that interval's first compatible period.
 
+Volume is drawn as a histogram overlay pinned to the lower band of the price pane and coloured by
+candle direction. The **Show volume** toggle hides it without refetching history, and the choice is
+URL-addressable through `volume=0` or `volume=1`:
+
+```text
+http://localhost:3000/chart/00000000-0000-4000-8000-000000000002?interval=1d&period=1y&volume=0
+```
+
+When a timeframe returns candles whose volume is entirely zero or absent, the chart keeps rendering
+prices, disables the toggle, and shows an explicit unavailable-volume badge rather than an empty
+band.
+
 Known chart limitations: there is no production market-data provider, entitlement enforcement, or
 missed-event replay. The SSE endpoint is demo-only and bounded by connection-count and duration
-limits.
+limits. Volume is reported as raw provider counts with no split or dividend adjustment.
 
 ## Test the vertical slice locally
 
@@ -239,9 +252,24 @@ PostgreSQL is the MVP system of record. Redis is disposable and is used only for
 and short-lived read acceleration. External identity and market-data systems will be isolated behind
 ports and adapters so vendor DTOs do not leak into canonical domain contracts.
 
-The MVP remains a responsive web application. Chart state is URL-addressable so a future Tauri
-desktop shell can be evaluated if validated users require multi-window or multi-monitor workflows;
-desktop packaging and offline storage are intentionally postponed.
+### Delivery platform decision
+
+The MVP is a responsive web application. Desktop packaging (Tauri or Electron) and PWA installation
+are deliberately postponed rather than rejected. Canvas rendering through `lightweight-charts` is not
+the current performance constraint, and a desktop shell would add code signing, an update channel,
+and a second CI matrix before there is a deployed web instance to validate demand against. Offline
+support has little value for live market data.
+
+Two invariants keep the deferral cheap, and both hold today:
+
+- The frontend reaches the backend only over HTTP and SSE through the configurable
+  `NEXT_PUBLIC_API_BASE_URL`, so it can point at a locally hosted API unchanged.
+- Chart state (instrument, interval, period, volume visibility) is URL-addressable, so window and
+  workspace restoration needs no new persistence layer.
+
+Revisit after the web MVP is validated, once watchlists and indicators make multi-window and
+multi-monitor workflows worth the packaging cost. The concrete blocker to resolve then is that
+`frontend/next.config.ts` sets neither `output: "export"` nor `output: "standalone"`.
 
 The initial directory layout is intentionally small:
 
@@ -275,6 +303,10 @@ location. Implementation work follows this order:
 The completed first vertical slice covers `E01-F01-S01` and `E01-F01-S02`: database-backed symbol
 and company search with accessible loading, success, empty, validation, error, retry, cancellation,
 and selection behavior.
+
+Charting work delivered so far covers `E02-F01` core price rendering, `E02-F03` timeframes and
+intervals, and `E02-F06-S01` volume display. The next chart story is `E02-F05-S01`, crosshair and
+data inspection.
 
 ## TDD and CI
 

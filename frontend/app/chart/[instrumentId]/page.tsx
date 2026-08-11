@@ -15,6 +15,7 @@ type ChartPageProps = {
   searchParams: Promise<{
     interval?: string | string[];
     period?: string | string[];
+    volume?: string | string[];
   }>;
 };
 
@@ -35,6 +36,7 @@ export default async function ChartPage({ params, searchParams }: ChartPageProps
           instrumentId={instrumentId}
           initialInterval={interval}
           initialPeriod={period}
+          initialShowVolume={readShowVolume(query.volume)}
         />
       </ErrorBoundary>
     </main>
@@ -51,4 +53,9 @@ function readInterval(value: string | string[] | undefined): CandleInterval {
 function readPeriod(value: string | string[] | undefined): ChartPeriod {
   const candidate = Array.isArray(value) ? value[0] : value;
   return CHART_PERIODS.includes(candidate as ChartPeriod) ? (candidate as ChartPeriod) : "1y";
+}
+
+function readShowVolume(value: string | string[] | undefined): boolean {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return candidate !== "0";
 }
