@@ -183,3 +183,6 @@
 | Story | E18-F05-S01 | Provider Failover and Data Quality Monitoring | MVP | Yes | `epics/E18/features/E18-F05/stories/STORY-E18-F05-S01-prd.md` |
 | Story | E18-F05-S02 | Provider Failover and Data Quality Monitoring | MVP | Yes | `epics/E18/features/E18-F05/stories/STORY-E18-F05-S02-prd.md` |
 | Story | E18-F05-S03 | Provider Failover and Data Quality Monitoring | Future Phase - Phase 2 | No - Future Phase | `epics/E18/features/E18-F05/stories/STORY-E18-F05-S03-prd.md` |
+| Epic | E19 | Desktop Shell and Workspace | MVP | Yes | `epics/E19/EPIC-E19-overview-prd.md` |
+| Feature | E19-F01 | Desktop Shell Bootstrap | MVP | Yes | `epics/E19/features/E19-F01/FEATURE-E19-F01-prd.md` |
+| Story | E19-F01-S01 | Load Existing Web UI in Electron | MVP | Yes | `epics/E19/features/E19-F01/stories/STORY-E19-F01-S01-prd.md` |

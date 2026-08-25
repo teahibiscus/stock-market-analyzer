@@ -46,6 +46,11 @@ const INTERVAL_LABELS: Record<CandleInterval, string> = {
 };
 
 const VOLUME_FORMAT = new Intl.NumberFormat("en-US");
+const INSPECTION_TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeStyle: "medium",
+  timeZone: "UTC",
+});
 
 const PERIOD_LABELS: Record<ChartPeriod, string> = {
   "1d": "1 day",
@@ -78,6 +83,7 @@ export function ChartPanel({
   const [streamState, setStreamState] = useState<StreamViewState>("idle");
   const [candles, setCandles] = useState<readonly MarketCandle[]>([]);
   const [history, setHistory] = useState<CandleHistoryResponse | null>(null);
+  const [inspectedCandle, setInspectedCandle] = useState<MarketCandle | null>(null);
   const requestSequence = useRef(0);
   const lastStreamSequence = useRef(0);
   const activeStream = useRef<CandleStream | null>(null);
@@ -94,6 +100,7 @@ export function ChartPanel({
     setStreamState("idle");
     setCandles([]);
     setHistory(null);
+    setInspectedCandle(null);
 
     void fetchHistory(apiBaseUrl, instrumentId, interval, period, controller.signal)
       .then((response) => {
@@ -166,11 +173,25 @@ export function ChartPanel({
     };
   }, [apiBaseUrl, createStream, fetchHistory, instrumentId, interval, period, retrySequence]);
 
+  function updateChartUrl(nextInterval: CandleInterval, nextPeriod: ChartPeriod) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("interval", nextInterval);
+    url.searchParams.set("period", nextPeriod);
+    window.history.replaceState(window.history.state, "", url);
+  }
+
   function changeInterval(nextInterval: CandleInterval) {
+    const nextPeriod = isCombinationSupported(nextInterval, period)
+      ? period
+      : (supportedPeriodsForInterval(nextInterval)[0] ?? period);
     setInterval(nextInterval);
-    if (!isCombinationSupported(nextInterval, period)) {
-      setPeriod(supportedPeriodsForInterval(nextInterval)[0] ?? period);
-    }
+    setPeriod(nextPeriod);
+    updateChartUrl(nextInterval, nextPeriod);
+  }
+
+  function changePeriod(nextPeriod: ChartPeriod) {
+    setPeriod(nextPeriod);
+    updateChartUrl(interval, nextPeriod);
   }
 
   function changeVolumeVisibility(nextShowVolume: boolean) {
@@ -220,7 +241,7 @@ export function ChartPanel({
             Chart period
             <select
               value={period}
-              onChange={(event) => setPeriod(event.target.value as ChartPeriod)}
+              onChange={(event) => changePeriod(event.target.value as ChartPeriod)}
             >
               {CHART_PERIODS.map((option) => (
                 <option
@@ -242,6 +263,12 @@ export function ChartPanel({
             />
             Show volume
           </label>
+          <button
+            type="button"
+            onClick={() => window.open(window.location.href, "_blank", "noopener,noreferrer")}
+          >
+            Open chart window
+          </button>
         </div>
       </div>
 
@@ -290,9 +317,31 @@ export function ChartPanel({
               </button>
             </div>
           ) : null}
+          <div className="chart-inspection" role="status" aria-label="Crosshair data">
+            {inspectedCandle === null ? (
+              <span>Move the crosshair over a candle to inspect OHLCV data.</span>
+            ) : (
+              <>
+                <time dateTime={inspectedCandle.timestamp}>
+                  {INSPECTION_TIME_FORMAT.format(new Date(inspectedCandle.timestamp))} UTC
+                </time>
+                <span>Open {inspectedCandle.open}</span>
+                <span>High {inspectedCandle.high}</span>
+                <span>Low {inspectedCandle.low}</span>
+                <span>Close {inspectedCandle.close}</span>
+                <span>
+                  Volume{" "}
+                  {inspectedCandle.volume === null
+                    ? "unavailable"
+                    : VOLUME_FORMAT.format(inspectedCandle.volume)}
+                </span>
+              </>
+            )}
+          </div>
           <ChartComponent
             candles={candles}
             showVolume={volumeVisible}
+            onInspectionChange={setInspectedCandle}
             accessibleLabel={`${displaySymbol ?? "Instrument"} candlestick chart for ${period} at ${interval} intervals. Latest close ${latestClose ?? "unavailable"}.${volumeLabel} Freshness ${freshnessState ?? "UNKNOWN"}.`}
             className="candlestick-chart"
           />

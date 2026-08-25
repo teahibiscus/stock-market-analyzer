@@ -3,14 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "frontend"
+    "frontend",
+    "desktop"
   ],
   "scripts": {
-    "build": "npm run build --workspace frontend",
+    "build": "npm run build --workspace frontend && npm run stage --workspace desktop",
+    "desktop:dev": "npm run start --workspace desktop",
     "format": "npm run format --workspace frontend",
     "format:check": "npm run format:check --workspace frontend",
     "lint": "npm run lint --workspace frontend",
-    "test": "npm run test:foundation && npm run test --workspace frontend",
+    "test": "npm run test:foundation && npm run test --workspace frontend && npm run test --workspace desktop",
     "test:foundation": "python -m unittest backend.tests.test_repository_foundation",
     "typecheck": "npm run typecheck --workspace frontend"
   },

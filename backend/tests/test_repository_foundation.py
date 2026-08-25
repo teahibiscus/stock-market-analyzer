@@ -18,9 +18,13 @@ class RepositoryFoundationTests(unittest.TestCase):
             "README.md",
             "backend/pyproject.toml",
             "compose.yaml",
+            "desktop/package.json",
             "frontend/package.json",
             "frontend/tsconfig.json",
             "package.json",
+            "product-requirements/epics/E19/EPIC-E19-overview-prd.md",
+            "product-requirements/epics/E19/features/E19-F01/FEATURE-E19-F01-prd.md",
+            "product-requirements/epics/E19/features/E19-F01/stories/STORY-E19-F01-S01-prd.md",
         )
 
         missing = [path for path in required_files if not (ROOT / path).is_file()]
@@ -64,7 +68,7 @@ class RepositoryFoundationTests(unittest.TestCase):
     def test_root_workspace_exposes_quality_commands(self) -> None:
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
 
-        self.assertEqual(["frontend"], package["workspaces"])
+        self.assertEqual(["frontend", "desktop"], package["workspaces"])
         for command in ("build", "format:check", "lint", "test", "typecheck"):
             self.assertIn(command, package["scripts"])
 

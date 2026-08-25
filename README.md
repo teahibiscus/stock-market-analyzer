@@ -27,8 +27,11 @@ implemented:
 - Search-to-chart navigation for every seeded instrument and bounded SSE demo updates
 - Interval and period controls with compatibility enforcement and responsive chart sizing
 - Volume histogram overlay with a keyboard-accessible toggle and an unavailable-volume state
+- Crosshair OHLCV inspection with pointer and keyboard access
+- Electron shell with owned API/frontend lifecycle, standalone staging, and chart windows
 
-The database-backed instrument-search and persisted candlestick-chart vertical slices are complete.
+The database-backed search, persisted chart, crosshair inspection, and initial desktop-shell slices
+are complete.
 
 ## Prerequisites
 
@@ -120,6 +123,29 @@ npm run dev --workspace frontend
 Open `http://localhost:3000` (primary) or `http://127.0.0.1:3000` to use instrument search,
 select an instrument, open its chart, and view the backend health probe. The backend CORS allow-list
 permits both local origins.
+
+## Run desktop shell
+
+Start PostgreSQL and Redis and apply migrations first. The Electron shell then starts missing
+FastAPI and Next.js processes, waits for health, and reuses either service if it is already running:
+
+```powershell
+npm run desktop:dev
+```
+
+The shell loads `http://127.0.0.1:3000`. Override it for development with `SMA_FRONTEND_URL`.
+Override the Python runtime with `SMA_PYTHON_EXECUTABLE`. The default is
+`.venv\Scripts\python.exe` on Windows. Docker still owns PostgreSQL and Redis.
+
+Build and stage the standalone Next.js server for future packaged resources with:
+
+```powershell
+npm run build
+```
+
+On a chart, **Open chart window** creates an independent same-origin window. Interval, period, and
+volume changes remain encoded in its URL. Move the pointer crosshair over a candle—or focus the chart
+and use Left/Right/Home/End—to inspect timestamp and OHLCV values.
 
 ## Run the chart locally
 
@@ -254,22 +280,19 @@ ports and adapters so vendor DTOs do not leak into canonical domain contracts.
 
 ### Delivery platform decision
 
-The MVP is a responsive web application. Desktop packaging (Tauri or Electron) and PWA installation
-are deliberately postponed rather than rejected. Canvas rendering through `lightweight-charts` is not
-the current performance constraint, and a desktop shell would add code signing, an update channel,
-and a second CI matrix before there is a deployed web instance to validate demand against. Offline
-support has little value for live market data.
+The product is desktop-first. Electron hosts the existing Next.js UI so chart and search code remain
+shared rather than rewritten. Phase 0 is a development shell; installers, code signing, automatic
+updates, bundled Next.js, and local service lifecycle remain later phases.
 
-Two invariants keep the deferral cheap, and both hold today:
+Two invariants keep the migration incremental:
 
 - The frontend reaches the backend only over HTTP and SSE through the configurable
   `NEXT_PUBLIC_API_BASE_URL`, so it can point at a locally hosted API unchanged.
 - Chart state (instrument, interval, period, volume visibility) is URL-addressable, so window and
   workspace restoration needs no new persistence layer.
 
-Revisit after the web MVP is validated, once watchlists and indicators make multi-window and
-multi-monitor workflows worth the packaging cost. The concrete blocker to resolve then is that
-`frontend/next.config.ts` sets neither `output: "export"` nor `output: "standalone"`.
+The next desktop phase will manage the local FastAPI process. A later packaging phase will set
+`frontend/next.config.ts` to `output: "standalone"`.
 
 The initial directory layout is intentionally small:
 
