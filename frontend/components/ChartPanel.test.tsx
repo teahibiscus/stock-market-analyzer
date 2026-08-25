@@ -85,6 +85,20 @@ function FakeChart({
   );
 }
 
+function InspectableChart({
+  candles,
+  onInspectionChange,
+}: {
+  candles: readonly MarketCandle[];
+  onInspectionChange?: (candle: MarketCandle | null) => void;
+}) {
+  return (
+    <button type="button" onClick={() => onInspectionChange?.(candles[0] ?? null)}>
+      Inspect candle
+    </button>
+  );
+}
+
 function createStreamHarness() {
   const connections: Array<{
     handlers: CandleStreamHandlers;
@@ -133,6 +147,40 @@ function renderPanel(overrides: Partial<ChartPanelProps> = {}) {
 }
 
 describe("ChartPanel", () => {
+  it("opens the current URL in an independent chart window", async () => {
+    window.history.replaceState({}, "", "/chart/instrument-aapl?interval=1m&period=1d&volume=1");
+    const openWindow = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderPanel({
+      createStream: createStreamHarness().factory,
+      fetchHistory: vi.fn().mockResolvedValue(response()),
+    });
+    await screen.findByTestId("chart");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open chart window" }));
+
+    expect(openWindow).toHaveBeenCalledWith(window.location.href, "_blank", "noopener,noreferrer");
+    openWindow.mockRestore();
+  });
+
+  it("shows timestamp and OHLCV values for the inspected candle", async () => {
+    renderPanel({
+      ChartComponent: InspectableChart,
+      createStream: createStreamHarness().factory,
+      fetchHistory: vi.fn().mockResolvedValue(response()),
+    });
+    await screen.findByRole("button", { name: "Inspect candle" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Inspect candle" }));
+
+    const inspection = screen.getByRole("status", { name: "Crosshair data" });
+    expect(inspection).toHaveTextContent("Jul 24, 2026");
+    expect(inspection).toHaveTextContent("Open 210.00");
+    expect(inspection).toHaveTextContent("High 210.25");
+    expect(inspection).toHaveTextContent("Low 209.95");
+    expect(inspection).toHaveTextContent("Close 210.10");
+    expect(inspection).toHaveTextContent("Volume 100");
+  });
+
   it("shows loading, renders history, labels demo data, then starts streaming", async () => {
     const request = deferred<CandleHistoryResponse>();
     const fetchHistory: NonNullable<ChartPanelProps["fetchHistory"]> = vi
@@ -166,6 +214,7 @@ describe("ChartPanel", () => {
   });
 
   it("keeps interval and period independent while disabling invalid combinations", async () => {
+    window.history.replaceState({}, "", "/chart/instrument-aapl?interval=1m&period=1d&volume=1");
     const fetchHistory: NonNullable<ChartPanelProps["fetchHistory"]> = vi
       .fn()
       .mockResolvedValue(response());
@@ -185,6 +234,8 @@ describe("ChartPanel", () => {
     await waitFor(() => expect(fetchHistory).toHaveBeenCalledTimes(3));
     expect(interval).toHaveValue("1h");
     expect(period).toHaveValue("3mo");
+    expect(new URLSearchParams(window.location.search).get("interval")).toBe("1h");
+    expect(new URLSearchParams(window.location.search).get("period")).toBe("3mo");
 
     fireEvent.change(period, { target: { value: "1d" } });
     await waitFor(() => expect(fetchHistory).toHaveBeenCalledTimes(4));

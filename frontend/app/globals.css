@@ -134,6 +134,7 @@ button:disabled {
 }
 
 .chart-controls select,
+.chart-controls button,
 .chart-message button {
   padding: 0.55rem 0.75rem;
 }
@@ -171,6 +172,19 @@ button:disabled {
 
 .chart-message {
   margin-block: 0.75rem;
+}
+
+.chart-inspection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  min-height: 2.25rem;
+  margin-bottom: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
 }
 
 .candlestick-chart {

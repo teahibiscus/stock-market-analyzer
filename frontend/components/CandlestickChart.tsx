@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { type KeyboardEvent, useEffect, useRef } from "react";
 import {
   CandlestickSeries,
   ColorType,
@@ -17,6 +17,7 @@ export type CandlestickChartProps = {
   accessibleLabel: string;
   showVolume?: boolean;
   className?: string;
+  onInspectionChange?: (candle: MarketCandle | null) => void;
 };
 
 const PRICE_MARGINS_WITH_VOLUME = { top: 0.1, bottom: 0.3 };
@@ -27,11 +28,18 @@ export function CandlestickChart({
   accessibleLabel,
   showVolume = true,
   className,
+  onInspectionChange,
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const priceSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const previousCandlesRef = useRef<readonly MarketCandle[]>([]);
+  const candlesRef = useRef(candles);
+  const inspectionCallbackRef = useRef(onInspectionChange);
+  const keyboardIndexRef = useRef(-1);
+
+  candlesRef.current = candles;
+  inspectionCallbackRef.current = onInspectionChange;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -76,6 +84,26 @@ export function CandlestickChart({
     volumeSeriesRef.current.priceScale().applyOptions({
       scaleMargins: { top: 0.8, bottom: 0 },
     });
+    const handleCrosshairMove = (parameter: { time?: unknown }) => {
+      const timestamp =
+        typeof parameter.time === "number"
+          ? parameter.time
+          : parameter.time !== null && typeof parameter.time === "object"
+            ? Date.UTC(
+                (parameter.time as { year: number }).year,
+                (parameter.time as { month: number }).month - 1,
+                (parameter.time as { day: number }).day,
+              ) / 1_000
+            : null;
+      const inspected =
+        timestamp === null
+          ? null
+          : (candlesRef.current.find(
+              (candle) => Date.parse(candle.timestamp) / 1_000 === timestamp,
+            ) ?? null);
+      inspectionCallbackRef.current?.(inspected);
+    };
+    chart.subscribeCrosshairMove(handleCrosshairMove);
 
     const resize = () => {
       chart.applyOptions({
@@ -91,6 +119,7 @@ export function CandlestickChart({
       priceSeriesRef.current = null;
       volumeSeriesRef.current = null;
       previousCandlesRef.current = [];
+      chart.unsubscribeCrosshairMove(handleCrosshairMove);
       chart.remove();
     };
   }, []);
@@ -131,5 +160,38 @@ export function CandlestickChart({
     previousCandlesRef.current = candles;
   }, [candles]);
 
-  return <div ref={containerRef} className={className} role="img" aria-label={accessibleLabel} />;
+  function inspectWithKeyboard(event: KeyboardEvent<HTMLDivElement>) {
+    if (candles.length === 0 || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+    if (event.key === "Home") {
+      keyboardIndexRef.current = 0;
+    } else if (event.key === "End") {
+      keyboardIndexRef.current = candles.length - 1;
+    } else if (event.key === "ArrowLeft") {
+      keyboardIndexRef.current =
+        keyboardIndexRef.current < 0
+          ? candles.length - 1
+          : Math.max(0, keyboardIndexRef.current - 1);
+    } else {
+      keyboardIndexRef.current =
+        keyboardIndexRef.current < 0
+          ? 0
+          : Math.min(candles.length - 1, keyboardIndexRef.current + 1);
+    }
+    inspectionCallbackRef.current?.(candles[keyboardIndexRef.current] ?? null);
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className={className}
+      role="img"
+      aria-label={accessibleLabel}
+      tabIndex={0}
+      onKeyDown={inspectWithKeyboard}
+    />
+  );
 }

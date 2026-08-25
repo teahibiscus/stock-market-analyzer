@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MarketCandle } from "@/lib/marketData";
@@ -14,6 +14,8 @@ const volumeScaleApplyOptions = vi.fn();
 const chartApplyOptions = vi.fn();
 const chartRemove = vi.fn();
 const addSeries = vi.fn();
+const subscribeCrosshairMove = vi.fn();
+const unsubscribeCrosshairMove = vi.fn();
 
 vi.mock("lightweight-charts", () => {
   const CandlestickSeries = { type: "Candlestick" };
@@ -26,6 +28,8 @@ vi.mock("lightweight-charts", () => {
       addSeries,
       applyOptions: chartApplyOptions,
       remove: chartRemove,
+      subscribeCrosshairMove,
+      unsubscribeCrosshairMove,
       priceScale: vi.fn(() => ({ applyOptions: priceScaleApplyOptions })),
     })),
   };
@@ -65,6 +69,41 @@ describe("CandlestickChart", () => {
         priceScale: () => ({ applyOptions: volumeScaleApplyOptions }),
       };
     });
+  });
+
+  it("reports the candle under the crosshair for data inspection", () => {
+    const onInspectionChange = vi.fn();
+    render(
+      <CandlestickChart
+        candles={[candle()]}
+        accessibleLabel="AAPL chart"
+        onInspectionChange={onInspectionChange}
+      />,
+    );
+
+    const handler = subscribeCrosshairMove.mock.calls[0]?.[0] as
+      ((parameter: { time: number }) => void) | undefined;
+    expect(handler).toBeDefined();
+    act(() => handler?.({ time: Date.parse("2026-01-02T00:00:00Z") / 1_000 }));
+
+    expect(onInspectionChange).toHaveBeenCalledWith(candle());
+  });
+
+  it("supports keyboard candle inspection", () => {
+    const onInspectionChange = vi.fn();
+    render(
+      <CandlestickChart
+        candles={[candle()]}
+        accessibleLabel="AAPL chart"
+        onInspectionChange={onInspectionChange}
+      />,
+    );
+
+    const chart = screen.getByRole("img", { name: "AAPL chart" });
+    expect(chart).toHaveAttribute("tabindex", "0");
+    fireEvent.keyDown(chart, { key: "ArrowLeft" });
+
+    expect(onInspectionChange).toHaveBeenCalledWith(candle());
   });
 
   it("creates an overlay histogram series for volume", () => {

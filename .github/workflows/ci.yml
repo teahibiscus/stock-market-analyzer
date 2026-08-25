@@ -61,5 +61,7 @@ jobs:
         run: npm run typecheck
       - name: Test
         run: npm run test --workspace frontend
+      - name: Test desktop shell
+        run: npm run test --workspace desktop
       - name: Build
         run: npm run build

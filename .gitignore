@@ -18,6 +18,7 @@ node_modules/
 .next/
 coverage/
 frontend/dist/
+desktop/dist/
 
 # Editors and operating systems
 .idea/

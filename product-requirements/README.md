@@ -16,6 +16,7 @@ This package contains expandable Product Requirements Documents for the MVP epic
 | E16 | Accounts, Persistence, Permissions, and Data Ownership | MVP |
 | E17 | Platform Reliability, Performance, and Observability | MVP |
 | E18 | Data Provider Integration and Market Data Operations | MVP |
+| E19 | Desktop Shell and Workspace | MVP |
 
 ## Scope Model
 
