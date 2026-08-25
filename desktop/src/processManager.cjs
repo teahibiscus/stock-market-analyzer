@@ -13,7 +13,7 @@ function resolveApiLaunch({
 } = {}) {
   const defaultPython =
     platform === "win32"
-      ? path.join(projectRoot, ".venv", "Scripts", "python.exe")
+      ? path.win32.join(projectRoot, ".venv", "Scripts", "python.exe")
       : path.join(projectRoot, ".venv", "bin", "python");
 
   return {

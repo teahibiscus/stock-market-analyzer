@@ -27,7 +27,10 @@ function resolveWebLaunch({
     };
   }
 
-  const serverPath = path.join(resourcesPath, "frontend", "server.js");
+  const serverPath =
+    platform === "win32"
+      ? path.win32.join(resourcesPath, "frontend", "server.js")
+      : path.join(resourcesPath, "frontend", "server.js");
   return {
     command: executablePath,
     args: [serverPath],
